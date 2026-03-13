@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Handwriting Recognition</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .ocr-output { background: #1e1e1e; color: #fff; padding: 15px; border-radius: 5px; font-family: monospace; }
+        .corrected { background: #e8f5e8; padding: 15px; border-radius: 5px; margin-top: 10px; }
+        input, button { padding: 10px; margin: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖊️ Handwriting Debug Tool</h1>
+        
+        <form action="/debug-handwriting" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit">Test Handwriting</button>
+        </form>
+        
+        {% if raw_ocr %}
+        <h3>📝 Raw OCR Output:</h3>
+        <div class="ocr-output">{{ raw_ocr }}</div>
+        
+        <h3>✅ Corrected Text:</h3>
+        <div class="corrected">{{ corrected_text }}</div>
+        
+        <h3>💻 Extracted Code:</h3>
+        <div class="corrected"><pre>{{ extracted_code }}</pre></div>
+        
+        <h3>✏️ Teach the System</h3>
+        <form action="/teach-handwriting" method="post">
+            <input type="hidden" name="original_ocr" value="{{ raw_ocr }}">
+            <input type="text" name="correct_code" placeholder="Enter correct code" size="50">
+            <button type="submit">Teach</button>
+        </form>
+        {% endif %}
+        
+        {% if message %}
+        <p class="success">{{ message }}</p>
+        {% endif %}
+    </div>
+</body>
+</html>
