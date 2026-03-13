@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Code Image to Text Converter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <style>
+        /* Crop Modal Styles */
+        .crop-modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .crop-modal-content {
+            background-color: #fff;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .crop-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .crop-modal-body {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .crop-container {
+            flex: 1;
+            max-height: 60vh;
+            background: #f5f5f5;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .crop-container img {
+            max-width: 100%;
+            display: block;
+        }
+
+        .crop-preview-container {
+            width: 200px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .crop-preview {
+            width: 200px;
+            height: 200px;
+            overflow: hidden;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background: #f5f5f5;
+        }
+
+        .crop-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 15px 20px;
+            border-top: 1px solid #e0e0e0;
+            background: #f8f9fa;
+        }
+
+        .crop-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .crop-btn-apply { background-color: #28a745; color: white; }
+        .crop-btn-cancel { background-color: #6c757d; color: white; }
+
+        .image-preview-wrapper {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border: 1px dashed #ccc;
+        }
+
+        @media (max-width: 768px) {
+            .crop-modal-body { flex-direction: column; }
+            .crop-preview-container { width: 100%; flex-direction: row; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <h1>Code Image to Text Converter</h1>
+                <div class="user-menu">
+                    <div class="user-info">
+                        <img src="{{ user.profile_pic or 'https://ui-avatars.com/api/?name=' + user.username + '&size=32&background=667eea&color=fff' }}" alt="Profile" class="profile-pic">
+                        <span class="user-name">{{ user.name or user.username }}</span>
+                        <div class="dropdown">
+                            <a href="{{ url_for('profile') }}" class="dropdown-item"><i class="fas fa-user"></i> Profile</a>
+                            <a href="{{ url_for('history') }}" class="dropdown-item"><i class="fas fa-history"></i> History</a>
+                            <a href="{{ url_for('logout') }}" class="dropdown-item"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p>Welcome to your dashboard, {{ user.name or user.username }}!</p>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">
+                            <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'error' %}exclamation-circle{% else %}info-circle{% endif %}"></i>
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="quick-actions">
+            <div class="quick-actions-card">
+                <h2><i class="fas fa-rocket"></i> Quick Actions</h2>
+                <div class="action-grid">
+                    <a href="#upload-section" class="action-item" onclick="document.getElementById('file').click(); return false;">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Upload New Image</span>
+                    </a>
+                    <a href="{{ url_for('history') }}" class="action-item">
+                        <i class="fas fa-history"></i>
+                        <span>View History</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div id="upload-section" class="upload-section">
+            <h2 class="section-title"><i class="fas fa-upload"></i> Upload Code Image</h2>
+            
+            <div class="handwriting-tip">
+                <i class="fas fa-crop-alt"></i>
+                <strong>Tip:</strong> Crop your image to focus on the code for better results!
+            </div>
+            
+            <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+                <div class="file-input-container">
+                    <input type="file" id="file" name="file" accept=".png,.jpg,.jpeg,.gif" required>
+                    <label for="file" class="file-label">
+                        <span class="file-button">Choose Image</span>
+                        <span class="file-name">No file chosen</span>
+                    </label>
+                </div>
+
+                <div class="image-preview-wrapper" id="image-preview-wrapper" style="display: none;">
+                    <img id="image-preview" src="#" alt="Preview" style="max-width: 100%; border-radius: 4px;">
+                    <div style="margin-top: 10px;">
+                        <button type="button" id="open-cropper" class="crop-btn" style="background: #667eea; color: white;">
+                            <i class="fas fa-crop"></i> Edit / Crop Image
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" name="handwritten" id="handwritten" checked>
+                        <span><i class="fas fa-pen"></i> This is handwritten text</span>
+                    </label>
+                </div>
+
+                <input type="hidden" name="cropped_image" id="cropped_image_data">
+                
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-code"></i> Analyze Code
+                </button>
+            </form>
+        </div>
+
+        {% if recent_analyses %}
+        <div class="recent-analyses">
+            <h2><i class="fas fa-clock"></i> Recent Analyses</h2>
+            <div class="history-list">
+                {% for analysis in recent_analyses %}
+                <div class="history-item">
+                    <div class="history-header">
+                        <span class="history-date">{{ analysis.created_at.strftime('%b %d, %Y') }}</span>
+                        <span class="language-badge {{ analysis.detected_language.lower() }}">
+                            {{ analysis.detected_language }}
+                        </span>
+                    </div>
+                    <div class="history-content">
+                        <div class="history-filename"><strong>File:</strong> {{ analysis.filename }}</div>
+                        <div class="code-preview">
+                            {{ analysis.extracted_code[:100] }}{% if analysis.extracted_code|length > 100 %}...{% endif %}
+                        </div>
+                    </div>
+                    <div class="history-actions">
+                        <a href="{{ url_for('view_analysis', analysis_id=analysis.id) }}" class="view-btn">
+                            <i class="fas fa-eye"></i> View
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="stats-section">
+            <h2><i class="fas fa-chart-bar"></i> Your Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ total_analyses }}</div>
+                    <div class="stat-label">Total Analyses</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ python_count }}</div>
+                    <div class="stat-label">Python Files</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ dart_count }}</div>
+                    <div class="stat-label">Dart Files</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="cropModal" class="crop-modal">
+        <div class="crop-modal-content">
+            <div class="crop-modal-header">
+                <h3><i class="fas fa-crop-alt"></i> Crop Your Code</h3>
+                <button class="crop-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="crop-modal-body">
+                <div class="crop-container">
+                    <img id="cropper-image" src="">
+                </div>
+                <div class="crop-preview-container">
+                    <div class="crop-preview"></div>
+                </div>
+            </div>
+            <div class="crop-modal-footer">
+                <button type="button" class="crop-btn crop-btn-cancel" onclick="closeModal()">Cancel</button>
+                <button type="button" class="crop-btn crop-btn-apply" id="applyCrop">Apply Crop</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script>
+        const fileInput = document.getElementById('file');
+        const imagePreviewWrapper = document.getElementById('image-preview-wrapper');
+        const imagePreview = document.getElementById('image-preview');
+        const cropperImage = document.getElementById('cropper-image');
+        const cropModal = document.getElementById('cropModal');
+        let cropper;
+
+        // Update file name and show preview
+        fileInput.addEventListener('change', function() {
+            const [file] = this.files;
+            if (file) {
+                document.querySelector('.file-name').textContent = file.name;
+                const url = URL.createObjectURL(file);
+                imagePreview.src = url;
+                imagePreviewWrapper.style.display = 'block';
+                cropperImage.src = url;
+            }
+        });
+
+        // Cropper Logic
+        document.getElementById('open-cropper').onclick = () => {
+            cropModal.style.display = 'flex';
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(cropperImage, {
+                viewMode: 1,
+                preview: '.crop-preview'
+            });
+        };
+
+        function closeModal() { cropModal.style.display = 'none'; }
+
+        document.getElementById('applyCrop').onclick = () => {
+            const canvas = cropper.getCroppedCanvas();
+            imagePreview.src = canvas.toDataURL();
+            document.getElementById('cropped_image_data').value = canvas.toDataURL('image/jpeg');
+            closeModal();
+        };
+
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({ behavior: 'smooth' });
+            });
+        });
+    </script>
+</body>
+</html>
